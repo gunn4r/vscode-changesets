@@ -1,31 +1,29 @@
-
 const vscode = require('vscode');
 const fs = require('fs');
 const path = require('path');
 const { exec } = require('child_process');
 
+const SECRET_STORAGE_API_KEY = 'geminiApiKey';
+
 /**
  * @param {vscode.ExtensionContext} context
  */
 function activate(context) {
-    // Register the manual 'changeset.add' command
-    let manualCommand = vscode.commands.registerCommand('changeset.add', async function () {
-        await runChangesetWorkflow(false);
-    });
+    // We need the context for secret storage, so we pass it to the command handler.
+    const commandHandler = (useAI) => runChangesetWorkflow(context, useAI);
 
-    // Register the AI-powered 'changeset.addWithAI' command
-    let aiCommand = vscode.commands.registerCommand('changeset.addWithAI', async function () {
-        await runChangesetWorkflow(true);
-    });
+    let manualCommand = vscode.commands.registerCommand('changeset.add', () => commandHandler(false));
+    let aiCommand = vscode.commands.registerCommand('changeset.addWithAI', () => commandHandler(true));
 
     context.subscriptions.push(manualCommand, aiCommand);
 }
 
 /**
  * Main logic for the changeset workflow.
+ * @param {vscode.ExtensionContext} context The extension context for secret storage.
  * @param {boolean} useAI - Whether to use the AI-powered workflow.
  */
-async function runChangesetWorkflow(useAI = false) {
+async function runChangesetWorkflow(context, useAI = false) {
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders || workspaceFolders.length === 0) {
         vscode.window.showErrorMessage('Changesets: No workspace folder found. Please open a project.');
@@ -46,7 +44,7 @@ async function runChangesetWorkflow(useAI = false) {
 
         if (useAI) {
             // AI-powered workflow
-            const aiSuggestion = await getAIChangesetSuggestion(rootPath, packages);
+            const aiSuggestion = await getAIChangesetSuggestion(context, rootPath, packages);
             if (!aiSuggestion) {
                 // Error or cancellation is handled inside the function
                 return;
@@ -54,12 +52,23 @@ async function runChangesetWorkflow(useAI = false) {
             packagesWithBumps = aiSuggestion.bumps;
             summary = aiSuggestion.summary;
 
-            // Confirm with the user
+            // Format the bumps for a more readable display in the detail section
+            const formattedBumps = Object.entries(packagesWithBumps)
+                .map(([pkg, bump]) => `  • ${pkg}: ${bump}`)
+                .join('\n');
+
+            const detailMessage = `Proposed Bumps:\n${formattedBumps}`;
+
+            // Confirm with the user using a structured message dialog
             const confirmation = await vscode.window.showInformationMessage(
-                `AI Suggestion: Bumps - ${JSON.stringify(packagesWithBumps)}. Summary - "${summary}". Create changeset?`,
-                { modal: true },
-                'Accept'
+                `AI Suggestion: "${summary}"`, // The main message is the summary
+                {
+                    modal: true,
+                    detail: detailMessage // The bumps are in the detail section
+                },
+                'Accept' // The button to accept
             );
+
 
             if (confirmation !== 'Accept') {
                 vscode.window.showInformationMessage('Changeset creation cancelled.');
@@ -99,11 +108,29 @@ async function runChangesetWorkflow(useAI = false) {
 
 /**
  * Uses Gemini to suggest changeset details based on staged git changes.
+ * @param {vscode.ExtensionContext} context The extension context.
  * @param {string} rootPath The root path of the workspace.
  * @param {Array<{name: string, path: string}>} packages The list of available packages.
  * @returns {Promise<{bumps: Object, summary: string} | null>}
  */
-async function getAIChangesetSuggestion(rootPath, packages) {
+async function getAIChangesetSuggestion(context, rootPath, packages) {
+    // Get the API key from secure storage, or prompt the user for it.
+    let apiKey = await context.secrets.get(SECRET_STORAGE_API_KEY);
+    if (!apiKey) {
+        apiKey = await vscode.window.showInputBox({
+            prompt: 'Please enter your Google Gemini API Key',
+            placeHolder: 'Enter your API key here',
+            ignoreFocusOut: true, // Keep the box open even if you click outside
+        });
+        if (apiKey) {
+            await context.secrets.store(SECRET_STORAGE_API_KEY, apiKey);
+            vscode.window.showInformationMessage('Gemini API Key stored securely.');
+        } else {
+            vscode.window.showErrorMessage('API Key is required for the AI feature.');
+            return null;
+        }
+    }
+
     const gitDiff = await getStagedGitDiff(rootPath);
     if (!gitDiff) {
         vscode.window.showErrorMessage('Changesets AI: No staged changes found. Please `git add` your changes first.');
@@ -154,7 +181,6 @@ Respond with a JSON object that strictly follows this schema. Do not include any
         try {
             let chatHistory = [{ role: "user", parts: [{ text: prompt }] }];
             const payload = { contents: chatHistory };
-            const apiKey = ""; // Gemini API key would be required here in a real scenario
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
             const response = await fetch(apiUrl, {
@@ -164,6 +190,12 @@ Respond with a JSON object that strictly follows this schema. Do not include any
             });
 
             if (!response.ok) {
+                // If the key is invalid, it's likely a 403 or 400 error.
+                if (response.status === 403 || response.status === 400) {
+                     // Clear the bad key so the user is prompted again next time.
+                    await context.secrets.delete(SECRET_STORAGE_API_KEY);
+                    throw new Error(`API request failed with status ${response.status}. Your API key might be invalid. It has been cleared, please try again.`);
+                }
                 throw new Error(`API request failed with status ${response.status}`);
             }
 
@@ -195,8 +227,6 @@ function getStagedGitDiff(cwd) {
     return new Promise((resolve, reject) => {
         exec('git diff --staged', { cwd, maxBuffer: 1024 * 10000 }, (error, stdout, stderr) => {
             if (error) {
-                // If there's an error but stdout has content, it might just be a warning.
-                // If stdout is empty, it's a real error.
                 if (!stdout) {
                     console.error(`git diff stderr: ${stderr}`);
                     return reject(error);
