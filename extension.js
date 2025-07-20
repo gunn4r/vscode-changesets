@@ -10,20 +10,21 @@ const SECRET_STORAGE_API_KEY = 'geminiApiKey';
  */
 function activate(context) {
     // We need the context for secret storage, so we pass it to the command handler.
-    const commandHandler = (useAI) => runChangesetWorkflow(context, useAI);
+    const commandHandler = (workflowType) => runChangesetWorkflow(context, workflowType);
 
-    let manualCommand = vscode.commands.registerCommand('changeset.add', () => commandHandler(false));
-    let aiCommand = vscode.commands.registerCommand('changeset.addWithAI', () => commandHandler(true));
+    let manualCommand = vscode.commands.registerCommand('changeset.add', () => commandHandler('manual'));
+    let aiCommand = vscode.commands.registerCommand('changeset.addWithAI', () => commandHandler('ai'));
+    let emptyCommand = vscode.commands.registerCommand('changeset.addEmpty', () => commandHandler('empty'));
 
-    context.subscriptions.push(manualCommand, aiCommand);
+    context.subscriptions.push(manualCommand, aiCommand, emptyCommand);
 }
 
 /**
  * Main logic for the changeset workflow.
  * @param {vscode.ExtensionContext} context The extension context for secret storage.
- * @param {boolean} useAI - Whether to use the AI-powered workflow.
+ * @param {string} workflowType - The type of workflow: 'manual', 'ai', or 'empty'.
  */
-async function runChangesetWorkflow(context, useAI = false) {
+async function runChangesetWorkflow(context, workflowType = 'manual') {
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders || workspaceFolders.length === 0) {
         vscode.window.showErrorMessage('Changesets: No workspace folder found. Please open a project.');
@@ -42,7 +43,7 @@ async function runChangesetWorkflow(context, useAI = false) {
         let packagesWithBumps;
         let summary;
 
-        if (useAI) {
+        if (workflowType === 'ai') {
             // AI-powered workflow
             const aiSuggestion = await getAIChangesetSuggestion(context, rootPath, packages);
             if (!aiSuggestion) {
@@ -71,6 +72,15 @@ async function runChangesetWorkflow(context, useAI = false) {
 
 
             if (confirmation !== 'Accept') {
+                vscode.window.showInformationMessage('Changeset creation cancelled.');
+                return;
+            }
+
+        } else if (workflowType === 'empty') {
+            // Empty changeset workflow
+            packagesWithBumps = {};
+            summary = await promptForEmptySummary();
+            if (summary === undefined) {
                 vscode.window.showInformationMessage('Changeset creation cancelled.');
                 return;
             }
@@ -322,6 +332,18 @@ async function promptForSummary() {
     return await vscode.window.showInputBox({
         prompt: 'Enter a summary for this changeset (this will be in the changelog)',
         placeHolder: 'A brief description of the changes...',
+    });
+}
+
+/**
+ * Prompts the user for a summary of the changes, allowing empty descriptions.
+ * @returns {Promise<string | undefined>} The summary text.
+ */
+async function promptForEmptySummary() {
+    return await vscode.window.showInputBox({
+        prompt: 'Enter a summary for this changeset (this will be in the changelog)',
+        placeHolder: 'A brief description of the changes... (can be empty)',
+        value: '', // Allow empty string
     });
 }
 

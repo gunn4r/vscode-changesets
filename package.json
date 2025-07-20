@@ -19,6 +19,10 @@
       {
         "command": "changeset.addWithAI",
         "title": "Changeset: Add with AI"
+      },
+      {
+        "command": "changeset.addEmpty",
+        "title": "Changeset: Add Empty"
       }
     ]
   },
