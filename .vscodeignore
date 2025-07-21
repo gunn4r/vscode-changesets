@@ -1,0 +1,15 @@
+# VS Code specific settings
+.vscode/**
+
+# GitHub Actions and CI
+.github/**
+
+# Git
+.gitignore
+
+# Changesets source files
+.changeset/
+
+# Setup documentation not for end-users
+SETUP.md
+CI_SETUP_SUMMARY.md

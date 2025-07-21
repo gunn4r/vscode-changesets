@@ -2,13 +2,29 @@
   "name": "vscode-changesets",
   "displayName": "Changesets",
   "description": "A VSCode extension for the changesets workflow.",
-  "version": "0.1.0",
+  "version": "0.2.0",
+  "publisher": "GreatSoftwareLLC",
   "engines": {
     "vscode": "^1.89.0"
   },
   "categories": [
     "Other"
   ],
+  "keywords": [
+    "changesets",
+    "versioning",
+    "release",
+    "changelog",
+    "semver"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gunn4r/vscode-changesets.git"
+  },
+  "bugs": {
+    "url": "https://github.com/gunn4r/vscode-changesets/issues"
+  },
+  "homepage": "https://github.com/gunn4r/vscode-changesets#readme",
   "main": "./extension.js",
   "contributes": {
     "commands": [
@@ -33,6 +49,9 @@
         "title": "Changeset: Set Gemini API Key"
       }
     ]
+  },
+  "scripts": {
+    "version": "changeset version"
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.5",

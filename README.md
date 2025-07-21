@@ -93,3 +93,143 @@ This extension is built for VSCode and requires Node.js. To run it in developmen
 1. Clone this repository
 2. Run `npm install`
 3. Press F5 in VSCode to launch the extension in a new Extension Development Host window
+
+## CI/CD Setup
+
+This project uses [changesets](https://github.com/changesets/changesets) for versioning and automated releases. The CI/CD pipeline automatically publishes to the VS Code Marketplace.
+
+### Required GitHub Secrets
+
+To enable automated publishing, you need to set up the following secret in your GitHub repository:
+
+1. **`VSCE_PAT`**: Your VS Code Marketplace Personal Access Token
+   - Create at: https://marketplace.visualstudio.com/manage
+   - Requires marketplace publish permissions
+
+### How It Works
+
+1. **Changeset Creation**: When you create changesets using the extension commands, they are stored in the `.changeset/` directory
+2. **Automated PRs**: The changesets bot automatically creates release PRs when changesets are added
+3. **Versioning**: When a release PR is merged, the CI automatically:
+   - Bumps version numbers based on changeset types
+   - Updates the changelog
+   - Publishes to the VS Code Marketplace
+   - Creates a GitHub release
+
+### Manual Release Process
+
+If you need to manually trigger a release:
+
+1. Create changesets using the extension commands
+2. Commit and push the changesets
+3. The bot will create a release PR automatically
+4. Review and merge the PR to trigger the release
+
+### Local Development
+
+To test the release process locally:
+
+```bash
+# Install changesets CLI
+npm install -g @changesets/cli
+
+# Create a changeset
+changeset
+
+# Preview the release
+changeset version
+
+# Preview the publish
+changeset publish --dry-run
+```
+
+## Contributing
+
+We welcome contributions to improve this extension! Here's how you can help:
+
+### Development Setup
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/gunn4r/vscode-changesets.git
+   cd vscode-changesets
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+
+3. **Open in VSCode**:
+   ```bash
+   code .
+   ```
+
+4. **Run the extension**:
+   - Press `F5` to launch the extension in a new Extension Development Host window
+   - Test your changes in the development environment
+
+### Making Changes
+
+1. **Create a feature branch**:
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+
+2. **Make your changes** to the extension code
+
+3. **Test your changes**:
+   - Use the Extension Development Host to test your changes
+   - Ensure all commands work correctly
+   - Test with different project configurations
+
+4. **Create a changeset**:
+   - Use the extension commands to create a changeset for your changes
+   - Or run `npx changeset` in the terminal
+   - Choose the appropriate version bump (patch, minor, major)
+
+5. **Commit and push**:
+   ```bash
+   git add .
+   git commit -m "feat: your feature description"
+   git push origin feature/your-feature-name
+   ```
+
+6. **Create a Pull Request**:
+   - The changesets bot will automatically create a release PR
+   - Review the proposed changes and version bumps
+   - Merge when ready
+
+### Development Guidelines
+
+- **Code Style**: Follow the existing code style and patterns
+- **Security**: All user inputs should be validated and sanitized
+- **Error Handling**: Provide clear error messages for users
+- **Documentation**: Update README.md for new features
+- **Testing**: Test your changes thoroughly before submitting
+
+### Areas for Contribution
+
+- **Bug Fixes**: Report and fix issues you encounter
+- **Feature Enhancements**: Add new functionality to the extension
+- **Documentation**: Improve README, add examples, or clarify instructions
+- **Performance**: Optimize extension performance
+- **Security**: Enhance security measures and validation
+- **UI/UX**: Improve the user experience and interface
+
+### Reporting Issues
+
+When reporting issues, please include:
+- VSCode version
+- Extension version
+- Steps to reproduce
+- Expected vs actual behavior
+- Any error messages or logs
+
+### Questions or Need Help?
+
+- Open an issue for bugs or feature requests
+- Start a discussion for questions or ideas
+- Check existing issues and discussions first
+
+Thank you for contributing to making this extension better for everyone!
