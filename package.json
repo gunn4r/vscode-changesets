@@ -23,6 +23,14 @@
       {
         "command": "changeset.addEmpty",
         "title": "Changeset: Add Empty"
+      },
+      {
+        "command": "changeset.clearApiKey",
+        "title": "Changeset: Clear Gemini API Key"
+      },
+      {
+        "command": "changeset.setApiKey",
+        "title": "Changeset: Set Gemini API Key"
       }
     ]
   },

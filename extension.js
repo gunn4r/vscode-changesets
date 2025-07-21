@@ -20,9 +20,10 @@ function validateAndSanitizePath(inputPath, basePath) {
     // Normalize the path and resolve it relative to basePath
     const normalizedPath = path.normalize(inputPath);
     const resolvedPath = path.resolve(basePath, normalizedPath);
+    const resolvedBasePath = path.resolve(basePath);
 
     // Ensure the resolved path is within the basePath
-    if (!resolvedPath.startsWith(path.resolve(basePath))) {
+    if (!resolvedPath.startsWith(resolvedBasePath)) {
         return null;
     }
 
@@ -65,8 +66,10 @@ function isValidPackageName(packageName) {
         return false;
     }
 
-    // Package names should be alphanumeric with hyphens and underscores
-    const packageNameRegex = /^[a-zA-Z0-9@][a-zA-Z0-9@._-]*$/;
+    // Package names can be:
+    // - Simple names: alphanumeric with hyphens and underscores
+    // - Scoped names: @scope/package-name
+    const packageNameRegex = /^(@[a-zA-Z0-9][a-zA-Z0-9._-]*\/)?[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
     return packageNameRegex.test(packageName) && packageName.length <= 214;
 }
 
@@ -108,8 +111,34 @@ function activate(context) {
     let manualCommand = vscode.commands.registerCommand('changeset.add', () => commandHandler('manual'));
     let aiCommand = vscode.commands.registerCommand('changeset.addWithAI', () => commandHandler('ai'));
     let emptyCommand = vscode.commands.registerCommand('changeset.addEmpty', () => commandHandler('empty'));
+    let clearApiKeyCommand = vscode.commands.registerCommand('changeset.clearApiKey', async () => {
+        await context.secrets.delete(SECRET_STORAGE_API_KEY);
+        vscode.window.showInformationMessage('API Key cleared. You will be prompted for a new key next time.');
+    });
 
-    context.subscriptions.push(manualCommand, aiCommand, emptyCommand);
+    let setApiKeyCommand = vscode.commands.registerCommand('changeset.setApiKey', async () => {
+        const apiKey = await vscode.window.showInputBox({
+            prompt: 'Please enter your Google Gemini API Key',
+            placeHolder: 'Enter your Gemini API key here',
+            ignoreFocusOut: true,
+            password: true // Hide the API key for security
+        });
+
+        if (apiKey) {
+            // Validate API key format
+            if (!isValidApiKey(apiKey)) {
+                vscode.window.showErrorMessage('Invalid Gemini API key format. Please check your key and try again.');
+                return;
+            }
+
+            await context.secrets.store(SECRET_STORAGE_API_KEY, apiKey);
+            vscode.window.showInformationMessage('Gemini API Key stored securely.');
+        } else {
+            vscode.window.showInformationMessage('Gemini API Key setting cancelled.');
+        }
+    });
+
+    context.subscriptions.push(manualCommand, aiCommand, emptyCommand, clearApiKeyCommand, setApiKeyCommand);
 }
 
 /**
@@ -222,19 +251,19 @@ async function getAIChangesetSuggestion(context, rootPath, packages) {
     if (!apiKey) {
         apiKey = await vscode.window.showInputBox({
             prompt: 'Please enter your Google Gemini API Key',
-            placeHolder: 'Enter your API key here',
+            placeHolder: 'Enter your Gemini API key here',
             ignoreFocusOut: true, // Keep the box open even if you click outside
         });
         if (apiKey) {
             // Validate API key format
             if (!isValidApiKey(apiKey)) {
-                vscode.window.showErrorMessage('Invalid API key format. Please check your key and try again.');
+                vscode.window.showErrorMessage('Invalid Gemini API key format. Please check your key and try again.');
                 return null;
             }
             await context.secrets.store(SECRET_STORAGE_API_KEY, apiKey);
             vscode.window.showInformationMessage('Gemini API Key stored securely.');
         } else {
-            vscode.window.showErrorMessage('API Key is required for the AI feature.');
+            vscode.window.showErrorMessage('Gemini API Key is required for the AI feature.');
             return null;
         }
     }
@@ -289,23 +318,24 @@ Respond with a JSON object that strictly follows this schema. Do not include any
         try {
             let chatHistory = [{ role: "user", parts: [{ text: prompt }] }];
             const payload = { contents: chatHistory };
-            const apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
-
+                        // Use query parameter for API key as required by Google Gemini API
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+            
             const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiKey}`
+                    'User-Agent': 'vscode-changesets-extension/1.0.0'
                 },
                 body: JSON.stringify(payload)
             });
 
             if (!response.ok) {
-                // If the key is invalid, it's likely a 403 or 400 error.
-                if (response.status === 403 || response.status === 400) {
+                // If the key is invalid, it's likely a 401, 403, or 400 error.
+                if (response.status === 401 || response.status === 403 || response.status === 400) {
                      // Clear the bad key so the user is prompted again next time.
                     await context.secrets.delete(SECRET_STORAGE_API_KEY);
-                    throw new Error(`API request failed with status ${response.status}. Your API key might be invalid. It has been cleared, please try again.`);
+                    throw new Error(`API request failed with status ${response.status}. Your Gemini API key might be invalid. It has been cleared, please try again.`);
                 }
                 throw new Error(`API request failed with status ${response.status}`);
             }
@@ -364,15 +394,14 @@ Respond with a JSON object that strictly follows this schema. Do not include any
  */
 function getStagedGitDiff(cwd) {
     return new Promise((resolve, reject) => {
-        // Validate the working directory
-        const validatedCwd = validateAndSanitizePath(cwd, process.cwd());
-        if (!validatedCwd) {
+        // Validate the working directory is a string
+        if (!cwd || typeof cwd !== 'string') {
             return reject(new Error('Invalid working directory'));
         }
 
         // Use a more secure approach with explicit command and arguments
         exec('git diff --staged', {
-            cwd: validatedCwd,
+            cwd: cwd,
             maxBuffer: 10 * 1024 * 1024, // 10MB buffer - reasonable for most diffs
             timeout: 30000 // 30 second timeout
         }, (error, stdout, stderr) => {
@@ -403,9 +432,8 @@ function getStagedGitDiff(cwd) {
  * @returns {Promise<Array<{name: string, path: string}>>} A promise that resolves to an array of package objects.
  */
 async function findPackages(rootPath) {
-    // Validate root path
-    const validatedRootPath = validateAndSanitizePath(rootPath, process.cwd());
-    if (!validatedRootPath) {
+    // Validate root path is a string and exists
+    if (!rootPath || typeof rootPath !== 'string') {
         throw new Error('Invalid root path');
     }
 
@@ -416,15 +444,16 @@ async function findPackages(rootPath) {
         throw new Error('Too many package.json files found. Please check your workspace structure.');
     }
 
-    const packages = [];
+        const packages = [];
     for (const file of packageJsonPaths) {
         try {
             const content = await vscode.workspace.fs.readFile(file);
             const json = JSON.parse(content.toString());
+            
             if (json.name && !json.private && isValidPackageName(json.name)) {
                 const packagePath = path.dirname(file.fsPath);
                 // Validate package path to prevent path traversal
-                const validatedPackagePath = validateAndSanitizePath(packagePath, validatedRootPath);
+                const validatedPackagePath = validateAndSanitizePath(packagePath, rootPath);
                 if (validatedPackagePath) {
                     packages.push({ name: json.name, path: validatedPackagePath });
                 }
@@ -433,13 +462,13 @@ async function findPackages(rootPath) {
             console.error(`Could not read or parse ${file.fsPath}`, e);
         }
     }
-    const rootPackageJsonPath = path.join(validatedRootPath, 'package.json');
+        const rootPackageJsonPath = path.join(rootPath, 'package.json');
     if (fs.existsSync(rootPackageJsonPath)) {
         try {
             const content = fs.readFileSync(rootPackageJsonPath, 'utf-8');
             const json = JSON.parse(content);
              if (json.name && !json.private && isValidPackageName(json.name) && !packages.some(p => p.name === json.name)) {
-                packages.unshift({ name: json.name, path: validatedRootPath });
+                packages.unshift({ name: json.name, path: rootPath });
             }
         } catch(e) {
             console.error(`Could not read or parse root package.json`, e);
@@ -547,16 +576,15 @@ async function promptForEmptySummary() {
  * @param {string} summary The summary of the changes.
  */
 async function createChangesetFile(rootPath, packagesWithBumps, summary) {
-    // Validate root path
-    const validatedRootPath = validateAndSanitizePath(rootPath, process.cwd());
-    if (!validatedRootPath) {
+    // Validate root path is a string
+    if (!rootPath || typeof rootPath !== 'string') {
         throw new Error('Invalid root path');
     }
 
-    const changesetDir = path.join(validatedRootPath, '.changeset');
+    const changesetDir = path.join(rootPath, '.changeset');
 
-    // Validate the changeset directory path
-    const validatedChangesetDir = validateAndSanitizePath(changesetDir, validatedRootPath);
+    // Validate the changeset directory path is within the root path
+    const validatedChangesetDir = validateAndSanitizePath(changesetDir, rootPath);
     if (!validatedChangesetDir) {
         throw new Error('Invalid changeset directory path');
     }
@@ -569,7 +597,7 @@ async function createChangesetFile(rootPath, packagesWithBumps, summary) {
     const fileName = `changeset-${randomId}.md`;
     const filePath = path.join(validatedChangesetDir, fileName);
 
-    // Validate the final file path
+    // Validate the final file path is within the changeset directory
     const validatedFilePath = validateAndSanitizePath(filePath, validatedChangesetDir);
     if (!validatedFilePath) {
         throw new Error('Invalid file path');

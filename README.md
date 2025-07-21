@@ -7,6 +7,8 @@ This extension provides a simple way to use the [changesets](https://github.com/
 -   **`Changeset: Add (Manual)` command:** Walks you through creating a new changeset file, similar to the `changeset add` CLI command.
 -   **`Changeset: Add with AI` command:** Automatically determines version bumps and generates a summary based on your staged git changes using Google's Gemini AI.
 -   **`Changeset: Add Empty` command:** Creates an empty changeset with no version bumps, useful for documentation-only changes.
+-   **`Changeset: Set Gemini API Key` command:** Manually set or replace your Google Gemini API key.
+-   **`Changeset: Clear Gemini API Key` command:** Remove your stored API key from secure storage.
 
 ## How to Use
 
@@ -60,6 +62,29 @@ This extension implements several security measures to protect your data and sys
 - **Memory Protection**: Limits on buffer sizes and file counts prevent memory exhaustion attacks
 - **Command Injection Protection**: Git commands are executed with validated working directories
 - **Cryptographically Secure Randomness**: File names are generated using secure random algorithms
+
+### API Key Security
+
+**Important**: When using the AI feature, your Google Gemini API key is transmitted as a query parameter in the URL. While this is the official method required by Google's API, it has some security implications:
+
+#### Security Considerations:
+- **Server Logs**: The API key may appear in Google's server logs
+- **Network Proxies**: Corporate or network proxies might log the full URL including the API key
+- **HTTPS Transmission**: The key is transmitted over HTTPS, but is visible in the URL
+
+#### Recommendations:
+1. **Use a Dedicated API Key**: Create a separate API key specifically for this extension rather than using your main Google account key
+2. **Monitor Usage**: Check your Google AI Studio dashboard for unexpected usage
+3. **Rotate Keys**: Consider rotating your API key periodically
+4. **Limit Scope**: If possible, create API keys with minimal required permissions
+
+#### What We Do to Protect You:
+- API keys are stored encrypted in VSCode's secure storage
+- Keys are automatically cleared if they become invalid
+- All API requests include a user agent for tracking
+- No API keys are logged or stored in plain text
+
+You can manage your API key using the `Changeset: Set API Key` and `Changeset: Clear API Key` commands.
 
 ## Development
 
