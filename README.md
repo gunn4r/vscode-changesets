@@ -1,6 +1,6 @@
 # Changesets VSCode Extension
 
-This extension provides a simple way to use the [changesets](https://github.com/changesets/changesets) workflow directly from within VSCode.
+This extension provides a simple way to use the [changesets](https://github.com/changesets/changesets) workflow directly from within VSCode or Cursor.
 
 ## Features
 
@@ -50,13 +50,13 @@ The AI-powered workflow uses Google's Gemini 2.0 Flash model to:
 - Generate a concise changelog summary
 - Present the suggestions in a user-friendly format for review
 
-The extension securely stores your API key using VSCode's built-in secret storage, so you only need to enter it once.
+The extension securely stores your API key using VSCode's / Cursor's built-in secret storage, so you only need to enter it once.
 
 ## Security
 
 This extension implements several security measures to protect your data and system:
 
-- **Secure API Key Storage**: API keys are stored using VSCode's built-in secret storage
+- **Secure API Key Storage**: API keys are stored using VSCode's / Cursor's built-in secret storage
 - **Path Validation**: All file operations validate paths to prevent path traversal attacks
 - **Input Sanitization**: All user inputs are validated and sanitized before processing
 - **Memory Protection**: Limits on buffer sizes and file counts prevent memory exhaustion attacks
@@ -79,7 +79,7 @@ This extension implements several security measures to protect your data and sys
 4. **Limit Scope**: If possible, create API keys with minimal required permissions
 
 #### What We Do to Protect You:
-- API keys are stored encrypted in VSCode's secure storage
+- API keys are stored encrypted in VSCode's / Cursor's secure storage
 - Keys are automatically cleared if they become invalid
 - All API requests include a user agent for tracking
 - No API keys are logged or stored in plain text
@@ -88,60 +88,11 @@ You can manage your API key using the `Changeset: Set API Key` and `Changeset: C
 
 ## Development
 
-This extension is built for VSCode and requires Node.js. To run it in development mode:
+This extension is built for VSCode and Cursor and requires Node.js. To run it in development mode:
 
 1. Clone this repository
 2. Run `npm install`
-3. Press F5 in VSCode to launch the extension in a new Extension Development Host window
-
-## CI/CD Setup
-
-This project uses [changesets](https://github.com/changesets/changesets) for versioning and automated releases. The CI/CD pipeline automatically publishes to the VS Code Marketplace.
-
-### Required GitHub Secrets
-
-To enable automated publishing, you need to set up the following secret in your GitHub repository:
-
-1. **`VSCE_PAT`**: Your VS Code Marketplace Personal Access Token
-   - Create at: https://marketplace.visualstudio.com/manage
-   - Requires marketplace publish permissions
-
-### How It Works
-
-1. **Changeset Creation**: When you create changesets using the extension commands, they are stored in the `.changeset/` directory
-2. **Automated PRs**: The changesets bot automatically creates release PRs when changesets are added
-3. **Versioning**: When a release PR is merged, the CI automatically:
-   - Bumps version numbers based on changeset types
-   - Updates the changelog
-   - Publishes to the VS Code Marketplace
-   - Creates a GitHub release
-
-### Manual Release Process
-
-If you need to manually trigger a release:
-
-1. Create changesets using the extension commands
-2. Commit and push the changesets
-3. The bot will create a release PR automatically
-4. Review and merge the PR to trigger the release
-
-### Local Development
-
-To test the release process locally:
-
-```bash
-# Install changesets CLI
-npm install -g @changesets/cli
-
-# Create a changeset
-changeset
-
-# Preview the release
-changeset version
-
-# Preview the publish
-changeset publish --dry-run
-```
+3. Press F5 in VSCode / Cursor to launch the extension in a new Extension Development Host window
 
 ## Contributing
 
@@ -160,9 +111,12 @@ We welcome contributions to improve this extension! Here's how you can help:
    npm install
    ```
 
-3. **Open in VSCode**:
+3. **Open in VSCode or Cursor**:
    ```bash
    code .
+   ```
+   ```bash
+   cursor .
    ```
 
 4. **Run the extension**:
@@ -220,7 +174,7 @@ We welcome contributions to improve this extension! Here's how you can help:
 ### Reporting Issues
 
 When reporting issues, please include:
-- VSCode version
+- VSCode or Cursor version
 - Extension version
 - Steps to reproduce
 - Expected vs actual behavior
