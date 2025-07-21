@@ -2,8 +2,9 @@
   "name": "vscode-changesets",
   "displayName": "Changesets",
   "description": "A VSCode extension for the changesets workflow.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "GreatSoftwareLLC",
+  "icon": "assets/logo.png",
   "engines": {
     "vscode": "^1.89.0"
   },
